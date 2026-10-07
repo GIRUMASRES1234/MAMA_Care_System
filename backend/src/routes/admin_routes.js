@@ -5,6 +5,10 @@ const {
 } = require("../controllers/admin_controller");
 
 const {
+  assignPatientToProvider,
+} = require("../controllers/assignment_controller");
+
+const {
   authenticateToken,
   authorizeRoles,
 } = require("../middleware/auth_middleware");
@@ -16,6 +20,13 @@ router.post(
   authenticateToken,
   authorizeRoles("admin"),
   createProvider
+);
+
+router.post(
+  "/assign-patient",
+  authenticateToken,
+  authorizeRoles("admin"),
+  assignPatientToProvider
 );
 
 module.exports = router;
