@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 
-const password = "YOUR_ACTUAL_PROVIDER_PASSWORD";
+const password = "PatientPassword123DD";
 
 bcrypt.hash(password, 10)
   .then((hash) => {
