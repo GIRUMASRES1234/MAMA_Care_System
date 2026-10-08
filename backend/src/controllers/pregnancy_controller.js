@@ -1,8 +1,11 @@
-
 const { pool } = require("../config/db");
 
 const createPregnancyProfile = async (req, res) => {
   try {
+    // Provider ID comes from the verified JWT
+    const providerId = req.user.userId;
+
+    // Patient ID comes from the URL
     const { patientId } = req.params;
 
     const {
@@ -15,7 +18,10 @@ const createPregnancyProfile = async (req, res) => {
       emergency_contact_phone,
     } = req.body;
 
-    // Step 1: Find the user
+    // -----------------------------------
+    // 1. Check that the patient exists
+    // -----------------------------------
+
     const patientResult = await pool.query(
       `SELECT user_id, role
        FROM users
@@ -30,7 +36,10 @@ const createPregnancyProfile = async (req, res) => {
       });
     }
 
-    // Step 2: Confirm the user is a patient
+    // -----------------------------------
+    // 2. Make sure the user is a patient
+    // -----------------------------------
+
     if (patientResult.rows[0].role !== "patient") {
       return res.status(400).json({
         success: false,
@@ -38,31 +47,29 @@ const createPregnancyProfile = async (req, res) => {
       });
     }
 
-    // Step 3: Calculate pregnancy week from LMP
-    let pregnancyWeek = null;
+    // -----------------------------------
+    // 3. Check provider-patient assignment
+    // -----------------------------------
 
-    if (lmp) {
-      const lmpDate = new Date(`${lmp}T00:00:00Z`);
-      const today = new Date();
-      today.setUTCHours(0, 0, 0, 0);
+    const assignmentResult = await pool.query(
+      `SELECT assignment_id
+       FROM provider_patients
+       WHERE provider_id = $1
+       AND patient_id = $2`,
+      [providerId, patientId]
+    );
 
-      if (
-        Number.isNaN(lmpDate.getTime()) ||
-        lmpDate > today
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid last menstrual period date",
-        });
-      }
-
-      pregnancyWeek = Math.floor(
-        (today.getTime() - lmpDate.getTime()) /
-        (7 * 24 * 60 * 60 * 1000)
-      );
+    if (assignmentResult.rows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "This patient is not assigned to you",
+      });
     }
 
-    // Step 4: Check for an existing profile
+    // -----------------------------------
+    // 4. Check existing pregnancy profile
+    // -----------------------------------
+
     const existingProfile = await pool.query(
       `SELECT profile_id
        FROM pregnancy_profiles
@@ -77,7 +84,10 @@ const createPregnancyProfile = async (req, res) => {
       });
     }
 
-    // Step 5: Save the profile
+    // -----------------------------------
+    // 5. Create pregnancy profile
+    // -----------------------------------
+
     const result = await pool.query(
       `INSERT INTO pregnancy_profiles (
         user_id,
@@ -85,12 +95,11 @@ const createPregnancyProfile = async (req, res) => {
         medical_conditions,
         lmp,
         edd,
-        pregnancy_week,
         pregnancy_history,
         emergency_contact_name,
         emergency_contact_phone
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *`,
       [
         patientId,
@@ -98,7 +107,6 @@ const createPregnancyProfile = async (req, res) => {
         medical_conditions || null,
         lmp || null,
         edd || null,
-        pregnancyWeek,
         pregnancy_history || null,
         emergency_contact_name || null,
         emergency_contact_phone || null,
@@ -113,14 +121,6 @@ const createPregnancyProfile = async (req, res) => {
 
   } catch (error) {
     console.error("Create pregnancy profile error:", error);
-
-    // Handle duplicate profiles safely
-    if (error.code === "23505") {
-      return res.status(409).json({
-        success: false,
-        message: "Pregnancy profile already exists",
-      });
-    }
 
     return res.status(500).json({
       success: false,
