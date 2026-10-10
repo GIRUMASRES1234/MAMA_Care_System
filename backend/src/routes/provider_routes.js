@@ -9,8 +9,10 @@ const {
 const {
   createPregnancyProfile,
 } = require("../controllers/pregnancy_controller");
+
 const {
   getAssignedPatients,
+  getPatientPregnancyProfile,
 } = require("../controllers/provider_controller");
 const router = express.Router();
 
@@ -40,5 +42,11 @@ router.get(
   authenticateToken,
   authorizeRoles("provider"),
   getAssignedPatients
+);
+router.get(
+  "/patients/:patientId/pregnancy-profile",
+  authenticateToken,
+  authorizeRoles("provider"),
+  getPatientPregnancyProfile
 );
 module.exports = router;
