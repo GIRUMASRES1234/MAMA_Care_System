@@ -9,7 +9,9 @@ const {
 const {
   createPregnancyProfile,
 } = require("../controllers/pregnancy_controller");
-
+const {
+  updatePregnancyProfile,
+} = require("../controllers/pregnancy_controller");
 const {
   getAssignedPatients,
   getPatientPregnancyProfile,
@@ -35,13 +37,20 @@ router.post(
   "/patients/:patientId/pregnancy-profile",
   authenticateToken,
   authorizeRoles("provider"),
-  createPregnancyProfile
+  createPregnancyProfile,
+  
 );
 router.get(
   "/patients",
   authenticateToken,
   authorizeRoles("provider"),
   getAssignedPatients
+);
+router.patch(
+  "/patients/:patientId/pregnancy-profile",
+  authenticateToken,
+  authorizeRoles("provider"),
+  updatePregnancyProfile
 );
 router.get(
   "/patients/:patientId/pregnancy-profile",

@@ -129,6 +129,168 @@ const createPregnancyProfile = async (req, res) => {
   }
 };
 
+
+
+const updatePregnancyProfile = async (req, res) => {
+  try {
+    const providerId = req.user.userId;
+    const { patientId } = req.params;
+
+    const allowedFields = [
+      "address",
+      "medical_conditions",
+      "lmp",
+      "edd",
+      "pregnancy_history",
+      "emergency_contact_name",
+      "emergency_contact_phone",
+    ];
+
+    // Keep only fields the provider is allowed to update.
+    const updates = Object.entries(req.body).filter(
+      ([key]) => allowedFields.includes(key)
+    );
+
+    if (updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid fields provided for update",
+      });
+    }
+
+    // Validate supplied dates before sending them to PostgreSQL.
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+    const dateToUtc = (value) => {
+      if (typeof value !== "string" ||
+          !datePattern.test(value)) {
+        return null;
+      }
+
+      const date = new Date(`${value}T00:00:00Z`);
+
+      if (
+        Number.isNaN(date.getTime()) ||
+        date.toISOString().slice(0, 10) !== value
+      ) {
+        return null;
+      }
+
+      return date;
+    };
+
+    for (const [key, value] of updates) {
+      if (["lmp", "edd"].includes(key) && value !== null) {
+        if (!dateToUtc(value)) {
+          return res.status(400).json({
+            success: false,
+            message: `${key} must be a valid YYYY-MM-DD date`,
+          });
+        }
+      }
+    }
+
+    const patientResult = await pool.query(
+      `SELECT user_id
+       FROM users
+       WHERE user_id = $1
+       AND role = 'patient'`,
+      [patientId]
+    );
+
+    if (patientResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Patient not found",
+      });
+    }
+
+    const assignmentResult = await pool.query(
+      `SELECT assignment_id
+       FROM provider_patients
+       WHERE provider_id = $1
+       AND patient_id = $2`,
+      [providerId, patientId]
+    );
+
+    if (assignmentResult.rows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "This patient is not assigned to you",
+      });
+    }
+
+    // Find the current profile.
+    const currentResult = await pool.query(
+      `SELECT profile_id, lmp, edd
+       FROM pregnancy_profiles
+       WHERE user_id = $1`,
+      [patientId]
+    );
+
+    if (currentResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Pregnancy profile not found",
+      });
+    }
+
+    const current = currentResult.rows[0];
+
+    const getUpdatedValue = (field) => {
+      const entry = updates.find(([key]) => key === field);
+      return entry ? entry[1] : current[field];
+    };
+
+    const newLmp = getUpdatedValue("lmp");
+    const newEdd = getUpdatedValue("edd");
+
+    if (
+      newLmp &&
+      newEdd &&
+      dateToUtc(newEdd) < dateToUtc(newLmp)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "EDD cannot be earlier than LMP",
+      });
+    }
+
+    // Build SQL only from whitelisted column names.
+    const setClauses = updates.map(
+      ([key], index) => `${key} = $${index + 1}`
+    );
+
+    const values = updates.map(([, value]) => value);
+    values.push(patientId);
+
+    const result = await pool.query(
+      `UPDATE pregnancy_profiles
+       SET ${setClauses.join(", ")}
+       WHERE user_id = $${values.length}
+       RETURNING *`,
+      values
+    );
+
+    return res.json({
+      success: true,
+      message: "Pregnancy profile updated successfully",
+      profile: result.rows[0],
+    });
+
+  } catch (error) {
+    console.error("Update pregnancy profile error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+
+
 module.exports = {
+   updatePregnancyProfile,
   createPregnancyProfile,
 };
