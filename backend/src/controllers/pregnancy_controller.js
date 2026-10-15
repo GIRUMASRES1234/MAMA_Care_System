@@ -50,6 +50,9 @@ const createPregnancyProfile = async (req, res) => {
     // -----------------------------------
     // 3. Check provider-patient assignment
     // -----------------------------------
+const {
+  calculatePregnancyWeek,
+} = require("../pregnancy_utils");
 
     const assignmentResult = await pool.query(
       `SELECT assignment_id
