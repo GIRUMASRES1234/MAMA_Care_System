@@ -1,6 +1,9 @@
 const { pool } = require("../config/db");
-
+const {
+  calculatePregnancyWeek,
+} = require("../utils/pregnancy_utils");
 const createPregnancyProfile = async (req, res) => {
+  
   try {
     // Provider ID comes from the verified JWT
     const providerId = req.user.userId;
@@ -50,9 +53,7 @@ const createPregnancyProfile = async (req, res) => {
     // -----------------------------------
     // 3. Check provider-patient assignment
     // -----------------------------------
-const {
-  calculatePregnancyWeek,
-} = require("../pregnancy_utils");
+
 
     const assignmentResult = await pool.query(
       `SELECT assignment_id
@@ -90,31 +91,38 @@ const {
     // -----------------------------------
     // 5. Create pregnancy profile
     // -----------------------------------
+// Calculate pregnancy week from LMP
+let pregnancyWeek = null;
 
-    const result = await pool.query(
-      `INSERT INTO pregnancy_profiles (
-        user_id,
-        address,
-        medical_conditions,
-        lmp,
-        edd,
-        pregnancy_history,
-        emergency_contact_name,
-        emergency_contact_phone
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING *`,
-      [
-        patientId,
-        address || null,
-        medical_conditions || null,
-        lmp || null,
-        edd || null,
-        pregnancy_history || null,
-        emergency_contact_name || null,
-        emergency_contact_phone || null,
-      ]
-    );
+if (lmp) {
+  pregnancyWeek = calculatePregnancyWeek(lmp);
+}
+   const result = await pool.query(
+  `INSERT INTO pregnancy_profiles (
+    user_id,
+    address,
+    medical_conditions,
+    lmp,
+    edd,
+    pregnancy_week,
+    pregnancy_history,
+    emergency_contact_name,
+    emergency_contact_phone
+  )
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+  RETURNING *`,
+  [
+    patientId,
+    address || null,
+    medical_conditions || null,
+    lmp || null,
+    edd || null,
+    pregnancyWeek,
+    pregnancy_history || null,
+    emergency_contact_name || null,
+    emergency_contact_phone || null,
+  ]
+);
 
     return res.status(201).json({
       success: true,
@@ -132,7 +140,14 @@ const {
   }
 };
 
+// Recalculate pregnancy week whenever LMP changes.
+if (updates.some(([key]) => key === "lmp")) {
+  const pregnancyWeek = newLmp
+    ? calculatePregnancyWeek(newLmp)
+    : null;
 
+  updates.push(["pregnancy_week", pregnancyWeek]);
+}
 
 const updatePregnancyProfile = async (req, res) => {
   try {

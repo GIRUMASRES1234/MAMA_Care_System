@@ -1,11 +1,12 @@
 
 const {
+  calculatePregnancyAge,
   calculatePregnancyWeek,
-} = require("./pregnancy_utils");
+} = require("./utils/pregnancy_utils");
 
 // Test 1: A valid date in the past
 const result = calculatePregnancyWeek("2026-01-01");
-console.log("Pregnancy week:", result);
+console.log("Pregnancy Week:", result);
 
 // Test 2: An impossible date
 try {

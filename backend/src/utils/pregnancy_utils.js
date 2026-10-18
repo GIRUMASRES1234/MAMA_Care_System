@@ -1,5 +1,5 @@
 
-const calculatePregnancyAge = (lmp) => {
+const calculatePregnancyWeek = (lmp) => {
   if (!lmp) {
     return null;
   }
@@ -41,4 +41,4 @@ const calculatePregnancyAge = (lmp) => {
   return { weeks, days };
 };
 
-module.exports = { calculatePregnancyAge };
+module.exports = { calculatePregnancyWeek };
