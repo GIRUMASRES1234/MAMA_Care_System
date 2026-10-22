@@ -1,12 +1,12 @@
 const { pool } = require("../config/db");
 const {
   calculatePregnancyWeek,
-} = require("../pregnancy_utils");
+} = require("../utils/pregnancy_utils");
 const getAssignedPatients = async (req, res) => {
-  try {
+  try { 
     // Get the authenticated provider's ID from the JWT
     const providerId = req.user.userId;
-
+    
     const result = await pool.query(
       `SELECT
         u.user_id,
@@ -102,7 +102,19 @@ const getPatientPregnancyProfile = async (req, res) => {
         message: "Pregnancy profile not found",
       });
     }
+const profile = profileResult.rows[0];
 
+const currentPregnancyWeek = profile.lmp
+  ? calculatePregnancyWeek(profile.lmp)
+  : null;
+
+return res.json({
+  success: true,
+  profile: {
+    ...profile,
+    pregnancy_week: currentPregnancyWeek,
+  },
+});
     // 6. Return the profile
     return res.json({
       success: true,

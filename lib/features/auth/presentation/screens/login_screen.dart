@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'register_screen.dart';
-import 'package:mamacare/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:mamacare/features/navigation/presentation/screens/main_navigation_screen.dart';
 
 class LoginScreen extends StatefulWidget {

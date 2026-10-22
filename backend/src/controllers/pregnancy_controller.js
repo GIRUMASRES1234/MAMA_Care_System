@@ -140,15 +140,6 @@ if (lmp) {
   }
 };
 
-// Recalculate pregnancy week whenever LMP changes.
-if (updates.some(([key]) => key === "lmp")) {
-  const pregnancyWeek = newLmp
-    ? calculatePregnancyWeek(newLmp)
-    : null;
-
-  updates.push(["pregnancy_week", pregnancyWeek]);
-}
-
 const updatePregnancyProfile = async (req, res) => {
   try {
     const providerId = req.user.userId;
@@ -262,6 +253,22 @@ const updatePregnancyProfile = async (req, res) => {
 
     const newLmp = getUpdatedValue("lmp");
     const newEdd = getUpdatedValue("edd");
+
+    // Keep the stored pregnancy week in sync whenever LMP changes.
+    if (updates.some(([key]) => key === "lmp")) {
+      let pregnancyWeek = null;
+
+      try {
+        pregnancyWeek = calculatePregnancyWeek(newLmp);
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+        });
+      }
+
+      updates.push(["pregnancy_week", pregnancyWeek]);
+    }
 
     if (
       newLmp &&

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'schedule_appointment_screen.dart';
 import 'patients_screen.dart';
 import 'package:mamacare/features/provider/presentation/screens/high_risk_patients_screen.dart';
 import 'package:mamacare/features/provider/presentation/screens/provider_appointments_screen.dart';

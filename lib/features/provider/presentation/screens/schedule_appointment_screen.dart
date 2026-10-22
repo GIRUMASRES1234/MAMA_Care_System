@@ -129,7 +129,7 @@ class _ScheduleAppointmentScreenState extends State<ScheduleAppointmentScreen> {
                   ),
                 ),
 
-                value: selectedPatient,
+                initialValue: selectedPatient,
 
                 items: patients.map((patient) {
                   return DropdownMenuItem(value: patient, child: Text(patient));
@@ -160,7 +160,7 @@ class _ScheduleAppointmentScreenState extends State<ScheduleAppointmentScreen> {
                   ),
                 ),
 
-                value: selectedAppointmentType,
+                initialValue: selectedAppointmentType,
 
                 items: appointmentTypes.map((type) {
                   return DropdownMenuItem(value: type, child: Text(type));
