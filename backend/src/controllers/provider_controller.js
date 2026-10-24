@@ -85,8 +85,8 @@ const getPatientPregnancyProfile = async (req, res) => {
         user_id,
         address,
         medical_conditions,
-        lmp,
-        edd,
+        TO_CHAR(lmp, 'YYYY-MM-DD') AS lmp,
+        TO_CHAR(edd, 'YYYY-MM-DD') AS edd,
         pregnancy_week,
         pregnancy_history,
         emergency_contact_name,
@@ -102,11 +102,30 @@ const getPatientPregnancyProfile = async (req, res) => {
         message: "Pregnancy profile not found",
       });
     }
+
 const profile = profileResult.rows[0];
 
-const currentPregnancyWeek = profile.lmp
-  ? calculatePregnancyWeek(profile.lmp)
-  : null;
+let currentPregnancyWeek = null;
+
+if (profile.lmp) {
+  try {
+    currentPregnancyWeek = calculatePregnancyWeek(
+      profile.lmp
+    );
+  } catch (error) {
+    console.error(
+      "Invalid LMP in pregnancy profile:",
+      error.message
+    );
+
+    return res.status(422).json({
+      success: false,
+      message:
+        "The recorded LMP date is invalid. Please verify the pregnancy profile.",
+    });
+  }
+}
+
 
 return res.json({
   success: true,
