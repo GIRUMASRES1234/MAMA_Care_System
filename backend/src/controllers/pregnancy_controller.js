@@ -246,29 +246,47 @@ const updatePregnancyProfile = async (req, res) => {
 
     const current = currentResult.rows[0];
 
-    const getUpdatedValue = (field) => {
-      const entry = updates.find(([key]) => key === field);
-      return entry ? entry[1] : current[field];
-    };
+    
+const getUpdatedValue = (field) => {
+  const entry = updates.find(([key]) => key === field);
+
+  if (!entry) {
+    return current[field];
+  }
+
+  const value = entry[1];
+
+  if (["lmp", "edd"].includes(field) && value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  return value;
+};
+
 
     const newLmp = getUpdatedValue("lmp");
     const newEdd = getUpdatedValue("edd");
 
     // Keep the stored pregnancy week in sync whenever LMP changes.
-    if (updates.some(([key]) => key === "lmp")) {
-      let pregnancyWeek = null;
+   
+if (updates.some(([key]) => key === "lmp")) {
+  let pregnancyWeek = null;
 
-      try {
-        pregnancyWeek = calculatePregnancyWeek(newLmp);
-      } catch (error) {
-        return res.status(400).json({
-          success: false,
-          message: error.message,
-        });
-      }
-
-      updates.push(["pregnancy_week", pregnancyWeek]);
+  try {
+    if (newLmp) {
+      const pregnancyData = calculatePregnancyWeek(newLmp);
+      pregnancyWeek = pregnancyData.weeks;
     }
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+
+  updates.push(["pregnancy_week", pregnancyWeek]);
+}
+
 
     if (
       newLmp &&
@@ -304,13 +322,14 @@ const updatePregnancyProfile = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Update pregnancy profile error:", error);
+  console.error("Update pregnancy profile error:", error.message);
+  console.error(error.stack);
 
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
+  return res.status(500).json({
+    success: false,
+    message: "Server error",
+  });
+}
 };
 
 
