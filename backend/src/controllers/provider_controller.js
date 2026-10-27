@@ -108,10 +108,13 @@ const profile = profileResult.rows[0];
 let currentPregnancyWeek = null;
 
 if (profile.lmp) {
+  
   try {
     currentPregnancyWeek = calculatePregnancyWeek(
       profile.lmp
     );
+    console.log("DEBUG LMP:", profile.lmp);
+console.log("DEBUG pregnancy week:", calculatePregnancyWeek(profile.lmp));
   } catch (error) {
     console.error(
       "Invalid LMP in pregnancy profile:",
@@ -129,17 +132,14 @@ if (profile.lmp) {
 
 return res.json({
   success: true,
+  message: "Pregnancy profile retrieved successfully",
   profile: {
     ...profile,
-    pregnancy_week: currentPregnancyWeek,
+    pregnancy_week: currentPregnancyWeek?.weeks ?? null,
+pregnancy_days: currentPregnancyWeek?.days ?? null,
   },
 });
-    // 6. Return the profile
-    return res.json({
-      success: true,
-      message: "Pregnancy profile retrieved successfully",
-      profile: profileResult.rows[0],
-    });
+  
 
   } catch (error) {
     console.error(
