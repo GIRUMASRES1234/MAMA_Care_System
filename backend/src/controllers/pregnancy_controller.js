@@ -267,6 +267,21 @@ const getUpdatedValue = (field) => {
     const newLmp = getUpdatedValue("lmp");
     const newEdd = getUpdatedValue("edd");
 
+const lmpIsBeingUpdated = updates.some(
+  ([key]) => key === "lmp"
+);
+
+const eddIsBeingUpdated = updates.some(
+  ([key]) => key === "edd"
+);
+
+if (lmpIsBeingUpdated && !eddIsBeingUpdated) {
+  return res.status(400).json({
+    success: false,
+    message: "Please provide EDD when updating LMP",
+  });
+}
+
     // Keep the stored pregnancy week in sync whenever LMP changes.
    
 if (updates.some(([key]) => key === "lmp")) {
