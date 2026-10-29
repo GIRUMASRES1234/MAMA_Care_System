@@ -89,6 +89,70 @@ const createAppointment = async (req, res) => {
       message: "Failed to schedule appointment",
     });
   }
+
+  
 };
 
-module.exports = { createAppointment };
+const getPatientAppointments = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    // 1. Verify that the patient exists
+    const patientResult = await pool.query(
+      `SELECT user_id
+       FROM users
+       WHERE user_id = $1 AND role = 'patient'`,
+      [patientId]
+    );
+
+    if (patientResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Patient not found",
+      });
+    }
+
+    // 2. Verify that the provider is assigned to this patient
+    const assignmentResult = await pool.query(
+      `SELECT 1
+       FROM provider_patients
+       WHERE provider_id = $1 AND patient_id = $2`,
+      [req.user.userId, patientId]
+    );
+
+    if (assignmentResult.rows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not assigned to this patient",
+      });
+    }
+
+    // 3. Retrieve appointments for this provider and patient
+    const result = await pool.query(
+      `SELECT appointment_id, patient_id, provider_id,
+              appointment_date, reason, status, created_at
+       FROM appointments
+       WHERE patient_id = $1 AND provider_id = $2
+       ORDER BY appointment_date ASC`,
+      [patientId, req.user.userId]
+    );
+
+    return res.status(200).json({
+      success: true,
+      count: result.rows.length,
+      appointments: result.rows,
+    });
+  } catch (error) {
+    console.error("Get patient appointments error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve appointments",
+    });
+  }
+};
+
+module.exports = {
+  createAppointment,
+  getPatientAppointments,
+};

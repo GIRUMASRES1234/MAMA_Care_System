@@ -2,6 +2,7 @@ const { pool } = require("../config/db");
 const {
   calculatePregnancyWeek,
 } = require("../utils/pregnancy_utils");
+
 const getAssignedPatients = async (req, res) => {
   try { 
     // Get the authenticated provider's ID from the JWT
@@ -152,6 +153,7 @@ pregnancy_days: currentPregnancyWeek?.days ?? null,
       message: "Server error",
     });
   }
+  
 };
 
 module.exports = {
