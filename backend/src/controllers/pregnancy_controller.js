@@ -4,6 +4,9 @@ const {
 } = require("../utils/pregnancy_utils");
 const createPregnancyProfile = async (req, res) => {
   
+
+
+
   try {
     // Provider ID comes from the verified JWT
     const providerId = req.user.userId;
