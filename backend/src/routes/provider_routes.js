@@ -7,6 +7,7 @@ const {
 } = require("../middleware/auth_middleware");
 const {
   createAppointment,
+  getPatientAppointments,
 } = require("../controllers/appointment_controller");
 const {
   createPregnancyProfile,
@@ -66,5 +67,12 @@ router.post(
   authenticateToken,
   authorizeRoles("provider"),
   createAppointment
+);
+// Get appointments for an assigned patient
+router.get(
+  "/patients/:patientId/appointments",
+  authenticateToken,
+  authorizeRoles("provider"),
+  getPatientAppointments
 );
 module.exports = router;
