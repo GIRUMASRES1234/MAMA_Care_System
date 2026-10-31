@@ -152,7 +152,153 @@ const getPatientAppointments = async (req, res) => {
   }
 };
 
+const updateAppointment = async (req, res) => {
+  try {
+    const { patientId, appointmentId } = req.params;
+    const { appointment_date, status } = req.body;
+
+    // 1. Validate that at least one field is provided
+    if (appointment_date === undefined && status === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide appointment date or status to update",
+      });
+    }
+
+    // 2. Validate the appointment date if provided
+    let appointmentDate;
+
+    if (appointment_date !== undefined) {
+      if (!appointment_date) {
+        return res.status(400).json({
+          success: false,
+          message: "Appointment date cannot be empty",
+        });
+      }
+
+      appointmentDate = new Date(appointment_date);
+
+      if (Number.isNaN(appointmentDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Please provide a valid appointment date",
+        });
+      }
+
+      if (appointmentDate <= new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: "Appointment date must be in the future",
+        });
+      }
+    }
+
+    // 3. Validate status if provided
+    const allowedStatuses = [
+      "scheduled",
+      "completed",
+      "cancelled",
+    ];
+
+    if (
+      status !== undefined &&
+      !allowedStatuses.includes(status)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid appointment status",
+      });
+    }
+
+    // 4. Check provider assignment
+    const assignmentResult = await pool.query(
+      `SELECT 1
+       FROM provider_patients
+       WHERE provider_id = $1 AND patient_id = $2`,
+      [req.user.userId, patientId]
+    );
+
+    if (assignmentResult.rows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not assigned to this patient",
+      });
+    }
+
+    // 5. Find the appointment owned by this provider
+    const appointmentResult = await pool.query(
+      `SELECT appointment_id, status
+       FROM appointments
+       WHERE appointment_id = $1
+         AND patient_id = $2
+         AND provider_id = $3`,
+      [appointmentId, patientId, req.user.userId]
+    );
+
+    if (appointmentResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Appointment not found",
+      });
+    }
+
+    const currentAppointment = appointmentResult.rows[0];
+
+    // 6. Prevent changes to completed or cancelled appointments
+    if (
+      currentAppointment.status !== "scheduled" &&
+      (appointment_date !== undefined || status !== undefined)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Completed or cancelled appointments cannot be updated",
+      });
+    }
+
+    // 7. Build the update query
+    const updates = [];
+    const values = [];
+
+    if (appointment_date !== undefined) {
+      values.push(appointmentDate.toISOString());
+      updates.push(`appointment_date = $${values.length}`);
+    }
+
+    if (status !== undefined) {
+      values.push(status);
+      updates.push(`status = $${values.length}`);
+    }
+
+    values.push(appointmentId, patientId, req.user.userId);
+
+    const result = await pool.query(
+      `UPDATE appointments
+       SET ${updates.join(", ")}
+       WHERE appointment_id = $${values.length - 2}
+         AND patient_id = $${values.length - 1}
+         AND provider_id = $${values.length}
+       RETURNING appointment_id, patient_id, provider_id,
+                 appointment_date, reason, status, created_at`,
+      values
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Appointment updated successfully",
+      appointment: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Update appointment error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update appointment",
+    });
+  }
+};
+
 module.exports = {
   createAppointment,
   getPatientAppointments,
+   updateAppointment,
 };
