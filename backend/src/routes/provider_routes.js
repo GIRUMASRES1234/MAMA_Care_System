@@ -8,6 +8,7 @@ const {
 const {
   createAppointment,
   getPatientAppointments,
+   updateAppointment,
 } = require("../controllers/appointment_controller");
 const {
   createPregnancyProfile,
@@ -66,7 +67,8 @@ router.post(
   "/patients/:patientId/appointments",
   authenticateToken,
   authorizeRoles("provider"),
-  createAppointment
+  createAppointment,
+   updateAppointment
 );
 // Get appointments for an assigned patient
 router.get(
