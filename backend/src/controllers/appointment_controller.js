@@ -62,19 +62,62 @@ const createAppointment = async (req, res) => {
     }
 
     // 5. Save the appointment
-    const result = await pool.query(
-      `INSERT INTO appointments
-         (patient_id, provider_id, appointment_date, reason)
-       VALUES ($1, $2, $3, $4)
-       RETURNING appointment_id, patient_id, provider_id,
-                 appointment_date, reason, status, created_at`,
-      [
-        patientId,
-        req.user.userId,
-        appointmentDate.toISOString(),
-        reason || null,
-      ]
-    );
+   
+// 5. Save appointment and create reminder
+const client = await pool.connect();
+
+let appointment;
+
+try {
+  // Start transaction
+  await client.query("BEGIN");
+
+  // Insert appointment
+  const appointmentResult = await client.query(
+    `INSERT INTO appointments
+       (patient_id, provider_id, appointment_date, reason)
+     VALUES ($1, $2, $3, $4)
+     RETURNING appointment_id, patient_id, provider_id,
+               appointment_date, reason, status, created_at`,
+    [
+      patientId,
+      req.user.userId,
+      appointmentDate.toISOString(),
+      reason || null,
+    ]
+  );
+
+  appointment = appointmentResult.rows[0];
+
+  // Calculate reminder time (24 hours before appointment)
+  const reminderTime = new Date(
+    appointmentDate.getTime() - 24 * 60 * 60 * 1000
+  );
+
+  // Insert reminder
+  await client.query(
+    `INSERT INTO reminders
+       (patient_id, appointment_id, reminder_time, message)
+     VALUES ($1, $2, $3, $4)`,
+    [
+      patientId,
+      appointment.appointment_id,
+      reminderTime.toISOString(),
+      "Your antenatal care appointment is tomorrow.",
+    ]
+  );
+
+  // Save both operations
+  await client.query("COMMIT");
+
+} catch (error) {
+  await client.query("ROLLBACK");
+  throw error;
+
+} finally {
+  client.release();
+}
+
 
     return res.status(201).json({
       success: true,
@@ -297,8 +340,43 @@ const updateAppointment = async (req, res) => {
   }
 };
 
+const getMyAppointments = async (req, res) => {
+  try {
+    // Get the patient ID from the authenticated token
+    const patientId = req.user.userId;
+
+    // Retrieve only this patient's appointments
+    const result = await pool.query(
+      `SELECT
+         appointment_id,
+         appointment_date,
+         reason,
+         status,
+         created_at
+       FROM appointments
+       WHERE patient_id = $1
+       ORDER BY appointment_date DESC`,
+      [patientId]
+    );
+
+    return res.status(200).json({
+      success: true,
+      count: result.rows.length,
+      appointments: result.rows,
+    });
+  } catch (error) {
+    console.error("Get my appointments error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve your appointments",
+    });
+  }
+};
+
 module.exports = {
   createAppointment,
   getPatientAppointments,
    updateAppointment,
+   getMyAppointments,
 };

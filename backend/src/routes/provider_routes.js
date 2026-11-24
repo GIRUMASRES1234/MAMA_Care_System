@@ -77,4 +77,11 @@ router.get(
   authorizeRoles("provider"),
   getPatientAppointments
 );
+// Update or reschedule an appointment
+router.patch(
+  "/patients/:patientId/appointments/:appointmentId",
+  authenticateToken,
+  authorizeRoles("provider"),
+  updateAppointment
+);
 module.exports = router;
