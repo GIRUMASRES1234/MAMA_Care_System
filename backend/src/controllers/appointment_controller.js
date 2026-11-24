@@ -122,7 +122,7 @@ try {
     return res.status(201).json({
       success: true,
       message: "Appointment scheduled successfully",
-      appointment: result.rows[0],
+      appointment: appointment,
     });
   } catch (error) {
     console.error("Create appointment error:", error);
