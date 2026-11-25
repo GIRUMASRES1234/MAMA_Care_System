@@ -195,20 +195,28 @@ const getPatientAppointments = async (req, res) => {
   }
 };
 
+
 const updateAppointment = async (req, res) => {
+  const client = await pool.connect();
+
+  let transactionStarted = false;
+
   try {
     const { patientId, appointmentId } = req.params;
     const { appointment_date, status } = req.body;
 
     // 1. Validate that at least one field is provided
-    if (appointment_date === undefined && status === undefined) {
+    if (
+      appointment_date === undefined &&
+      status === undefined
+    ) {
       return res.status(400).json({
         success: false,
         message: "Provide appointment date or status to update",
       });
     }
 
-    // 2. Validate the appointment date if provided
+    // 2. Validate appointment date if provided
     let appointmentDate;
 
     if (appointment_date !== undefined) {
@@ -236,7 +244,7 @@ const updateAppointment = async (req, res) => {
       }
     }
 
-    // 3. Validate status if provided
+    // 3. Validate status
     const allowedStatuses = [
       "scheduled",
       "completed",
@@ -253,8 +261,12 @@ const updateAppointment = async (req, res) => {
       });
     }
 
-    // 4. Check provider assignment
-    const assignmentResult = await pool.query(
+    // 4. Start transaction
+    await client.query("BEGIN");
+    transactionStarted = true;
+
+    // 5. Verify provider assignment
+    const assignmentResult = await client.query(
       `SELECT 1
        FROM provider_patients
        WHERE provider_id = $1 AND patient_id = $2`,
@@ -262,23 +274,30 @@ const updateAppointment = async (req, res) => {
     );
 
     if (assignmentResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      transactionStarted = false;
+
       return res.status(403).json({
         success: false,
         message: "You are not assigned to this patient",
       });
     }
 
-    // 5. Find the appointment owned by this provider
-    const appointmentResult = await pool.query(
+    // 6. Find and lock the appointment
+    const appointmentResult = await client.query(
       `SELECT appointment_id, status
        FROM appointments
        WHERE appointment_id = $1
          AND patient_id = $2
-         AND provider_id = $3`,
+         AND provider_id = $3
+       FOR UPDATE`,
       [appointmentId, patientId, req.user.userId]
     );
 
     if (appointmentResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      transactionStarted = false;
+
       return res.status(404).json({
         success: false,
         message: "Appointment not found",
@@ -287,18 +306,18 @@ const updateAppointment = async (req, res) => {
 
     const currentAppointment = appointmentResult.rows[0];
 
-    // 6. Prevent changes to completed or cancelled appointments
-    if (
-      currentAppointment.status !== "scheduled" &&
-      (appointment_date !== undefined || status !== undefined)
-    ) {
+    // 7. Prevent changes to completed or cancelled appointments
+    if (currentAppointment.status !== "scheduled") {
+      await client.query("ROLLBACK");
+      transactionStarted = false;
+
       return res.status(400).json({
         success: false,
         message: "Completed or cancelled appointments cannot be updated",
       });
     }
 
-    // 7. Build the update query
+    // 8. Build appointment update query
     const updates = [];
     const values = [];
 
@@ -314,7 +333,7 @@ const updateAppointment = async (req, res) => {
 
     values.push(appointmentId, patientId, req.user.userId);
 
-    const result = await pool.query(
+    const result = await client.query(
       `UPDATE appointments
        SET ${updates.join(", ")}
        WHERE appointment_id = $${values.length - 2}
@@ -325,20 +344,69 @@ const updateAppointment = async (req, res) => {
       values
     );
 
+    const updatedAppointment = result.rows[0];
+
+    // 9. Synchronize reminders
+    if (
+      updatedAppointment.status === "completed" ||
+      updatedAppointment.status === "cancelled"
+    ) {
+      // Cancel pending reminders
+      await client.query(
+        `UPDATE reminders
+         SET status = 'cancelled'
+         WHERE appointment_id = $1
+           AND status = 'pending'`,
+        [appointmentId]
+      );
+
+    } else if (appointment_date !== undefined) {
+      // Calculate reminder time: 24 hours before appointment
+      const reminderTime = new Date(
+        appointmentDate.getTime() -
+          24 * 60 * 60 * 1000
+      );
+
+      // Update reminder time and make it pending again
+      await client.query(
+        `UPDATE reminders
+         SET reminder_time = $1,
+             status = 'pending'
+         WHERE appointment_id = $2`,
+        [
+          reminderTime.toISOString(),
+          appointmentId,
+        ]
+      );
+    }
+
+    // 10. Save appointment and reminder changes
+    await client.query("COMMIT");
+    transactionStarted = false;
+
     return res.status(200).json({
       success: true,
       message: "Appointment updated successfully",
-      appointment: result.rows[0],
+      appointment: updatedAppointment,
     });
+
   } catch (error) {
+    if (transactionStarted) {
+      await client.query("ROLLBACK");
+    }
+
     console.error("Update appointment error:", error);
 
     return res.status(500).json({
       success: false,
       message: "Failed to update appointment",
     });
+
+  } finally {
+    client.release();
   }
 };
+
 
 const getMyAppointments = async (req, res) => {
   try {
