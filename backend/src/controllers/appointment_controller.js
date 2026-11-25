@@ -90,9 +90,23 @@ try {
   appointment = appointmentResult.rows[0];
 
   // Calculate reminder time (24 hours before appointment)
-  const reminderTime = new Date(
+ const now = new Date();
+
+const hoursUntilAppointment =
+  (appointmentDate.getTime() - now.getTime()) /
+  (1000 * 60 * 60);
+
+let reminderTime = null;
+
+if (hoursUntilAppointment >= 24) {
+  reminderTime = new Date(
     appointmentDate.getTime() - 24 * 60 * 60 * 1000
   );
+} else if (hoursUntilAppointment >= 1) {
+  reminderTime = new Date(
+    appointmentDate.getTime() - 60 * 60 * 1000
+  );
+}
 
   // Insert reminder
   await client.query(
