@@ -45,7 +45,43 @@ const getMyPregnancyProfile = async (req, res) => {
     });
   }
 };
+const getMyReminders = async (req, res) => {
+  try {
+    // Get the authenticated patient's ID
+    const userId = req.user.userId;
 
+    const result = await pool.query(
+      `SELECT
+        reminder_id,
+        appointment_id,
+        reminder_time,
+        message,
+        status
+       FROM reminders
+      WHERE patient_id = $1
+AND status = 'pending'
+AND reminder_time > CURRENT_TIMESTAMP
+ORDER BY reminder_time ASC`,
+      [userId]
+    );
+
+    return res.json({
+      success: true,
+      message: "Reminders retrieved successfully",
+      count: result.rows.length,
+      reminders: result.rows,
+    });
+
+  } catch (error) {
+    console.error("Get patient reminders error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
 module.exports = {
   getMyPregnancyProfile,
+  getMyReminders,
 };

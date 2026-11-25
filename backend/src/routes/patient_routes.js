@@ -7,6 +7,7 @@ const {
 
 const {
   getMyPregnancyProfile,
+  getMyReminders,
 } = require("../controllers/patient_controller");
 
 const {
@@ -27,5 +28,11 @@ router.get(
   authenticateToken,
   authorizeRoles("patient"),
   getMyAppointments
+);
+router.get(
+  "/reminders",
+  authenticateToken,
+  authorizeRoles("patient"),
+  getMyReminders
 );
 module.exports = router;
